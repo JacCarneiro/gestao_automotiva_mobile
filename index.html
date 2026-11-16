@@ -26,6 +26,10 @@ button{font:inherit;cursor:pointer}
 #help{max-width:340px;padding:16px;border-radius:14px;background:#0F5260;line-height:1.6;font-size:15px;text-align:left}
 #help b{color:#fff}
 #done{font-weight:700;color:#fff}
+#prog{width:260px;display:flex;flex-direction:column;gap:10px;align-items:center}
+#prog .track{width:100%;height:12px;border-radius:6px;background:#0F5260;overflow:hidden}
+#prog .fill{height:100%;width:0;border-radius:6px;background:#fff;transition:width .3s}
+#prog span{font-size:15px;color:#CFE8EC}
 </style>
 </head>
 <body>
@@ -34,6 +38,10 @@ button{font:inherit;cursor:pointer}
   <h1>Meus Veículos</h1>
   <p>Abastecimentos, manutenção e despesas dos seus veículos, direto da tela inicial do celular.</p>
   <button id="install" type="button">Instalar app</button>
+  <div id="prog" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Instalando o app">
+    <div class="track"><div class="fill" id="fill"></div></div>
+    <span id="progtxt">Instalando… isso pode levar alguns segundos.</span>
+  </div>
   <div id="help" hidden></div>
   <p id="done" hidden>Pronto! Abra o app pelo ícone "Veículos" na tela inicial.</p>
   <button id="open" type="button">Abrir no navegador, sem instalar</button>
@@ -62,15 +70,48 @@ function openApp() {
   $('app').src = APP_URL;
 }
 
+var timer = null, pct = 0, giveUp = null;
+function setPct(v) {
+  pct = v;
+  $('fill').style.width = v + '%';
+  $('prog').setAttribute('aria-valuenow', String(Math.round(v)));
+}
+function startProgress() {
+  $('install').hidden = true; $('help').hidden = true; $('open').hidden = true;
+  $('prog').hidden = false;
+  $('progtxt').textContent = 'Instalando… isso pode levar alguns segundos.';
+  setPct(5);
+  clearInterval(timer);
+  timer = setInterval(function () { setPct(pct + (90 - pct) * 0.05); }, 300); // estimativa: chega perto de 90% e espera
+  clearTimeout(giveUp);
+  giveUp = setTimeout(function () {
+    clearInterval(timer);
+    $('progtxt').textContent = 'Está demorando. Veja se o ícone "Veículos" já apareceu na tela inicial.';
+    $('open').hidden = false;
+  }, 60000);
+}
+function stopProgress() {
+  clearInterval(timer); clearTimeout(giveUp);
+  $('prog').hidden = true;
+}
+
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
 window.addEventListener('appinstalled', function () {
-  $('install').hidden = true; $('help').hidden = true; $('open').hidden = true; $('done').hidden = false;
+  clearInterval(timer); clearTimeout(giveUp);
+  $('install').hidden = true; $('help').hidden = true; $('open').hidden = true;
+  if ($('prog').hidden) { $('done').hidden = false; return; }
+  setPct(100);
+  setTimeout(function () { stopProgress(); $('done').hidden = false; }, 600);
 });
 
 $('install').addEventListener('click', function () {
   if (deferred) {
-    deferred.prompt();
-    deferred.userChoice.then(function () { deferred = null; });
+    var d = deferred;
+    d.prompt();
+    d.userChoice.then(function (r) {
+      deferred = null;
+      if (r && r.outcome === 'accepted') startProgress();
+    });
     return;
   }
   var h = $('help');
