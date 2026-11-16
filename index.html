@@ -12,26 +12,77 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Meus Veículos</title>
 <style>
-html,body{margin:0;height:100%;background:#0B3F4A;font-family:system-ui,sans-serif}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#0B3F4A;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#F4F3EF}
-#aviso{display:none;color:#fff;padding:32px;line-height:1.5}
+#landing{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 24px;text-align:center}
+#landing img{width:96px;height:96px;border-radius:22px}
+h1{margin:0;font-size:28px}
+p{margin:0;max-width:320px;line-height:1.5;color:#CFE8EC}
+button{font:inherit;cursor:pointer}
+#install{min-height:56px;min-width:240px;padding:0 28px;border:0;border-radius:16px;background:#fff;color:#0B3F4A;font-size:18px;font-weight:700}
+#open{min-height:48px;padding:0 16px;border:0;background:none;color:#CFE8EC;font-size:15px;text-decoration:underline}
+#help{max-width:340px;padding:16px;border-radius:14px;background:#0F5260;line-height:1.6;font-size:15px;text-align:left}
+#help b{color:#fff}
+#done{font-weight:700;color:#fff}
 </style>
 </head>
 <body>
-<div id="aviso"></div>
-<iframe id="app" title="Meus Veículos"></iframe>
+<main id="landing">
+  <img src="icon-192.png" alt="">
+  <h1>Meus Veículos</h1>
+  <p>Abastecimentos, manutenção e despesas dos seus veículos, direto da tela inicial do celular.</p>
+  <button id="install" type="button">Instalar app</button>
+  <div id="help" hidden></div>
+  <p id="done" hidden>Pronto! Abra o app pelo ícone "Veículos" na tela inicial.</p>
+  <button id="open" type="button">Abrir no navegador, sem instalar</button>
+</main>
+<iframe id="app" title="Meus Veículos" hidden></iframe>
+<div id="aviso" hidden style="padding:32px;line-height:1.5"></div>
 <script>
 // >>> COLE AQUI o endereço do app da web (termina em /exec) <<<
 var APP_URL = 'https://script.google.com/macros/s/AKfycbz_XmUbtaToM-_PDyD2pl2rAwYvke0rW9H4NaP7Fk2va-cx3oJEfCVLTl7QHUVidVu0/exec';
 
-if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(APP_URL)) {
-  document.getElementById('app').style.display = 'none';
-  var a = document.getElementById('aviso');
-  a.style.display = 'block';
-  a.innerHTML = '<h2>Falta configurar</h2><p>Abra o arquivo <b>index.html</b> desta pasta e troque o valor de <b>APP_URL</b> pelo endereço do seu app (o que termina em /exec).</p>';
-} else {
-  document.getElementById('app').src = APP_URL;
+var $ = function (id) { return document.getElementById(id); };
+var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+var ua = navigator.userAgent || '';
+var isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+var deferred = null;
+
+function openApp() {
+  if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(APP_URL)) {
+    $('landing').hidden = true;
+    $('aviso').hidden = false;
+    $('aviso').innerHTML = '<h2>Falta configurar</h2><p>Abra o arquivo <b>index.html</b> e troque o valor de <b>APP_URL</b> pelo endereço do seu app (o que termina em /exec).</p>';
+    return;
+  }
+  $('landing').hidden = true;
+  $('app').hidden = false;
+  $('app').src = APP_URL;
 }
+
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
+window.addEventListener('appinstalled', function () {
+  $('install').hidden = true; $('help').hidden = true; $('open').hidden = true; $('done').hidden = false;
+});
+
+$('install').addEventListener('click', function () {
+  if (deferred) {
+    deferred.prompt();
+    deferred.userChoice.then(function () { deferred = null; });
+    return;
+  }
+  var h = $('help');
+  h.hidden = false;
+  h.innerHTML = isIOS
+    ? 'No iPhone, use o <b>Safari</b>:<br>1. Toque em <b>Compartilhar</b> (quadrado com seta).<br>2. Escolha <b>Adicionar à Tela de Início</b>.<br>3. Toque em <b>Adicionar</b>.'
+    : 'Abra o menu do navegador (<b>⋮</b>) e toque em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.<br>Se a opção não aparecer, abra este endereço no <b>Chrome</b>.';
+});
+$('open').addEventListener('click', openApp);
+
+if (standalone) openApp();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 }
